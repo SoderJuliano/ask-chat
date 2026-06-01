@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat MCP</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+  <button class="theme-toggle" id="themeToggle" title="Alternar tema">☀️</button>
+  <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="Expandir sidebar">»</button>
+  <div class="app-container">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Chats</h2>
+        <div class="header-buttons">
+          <button class="new-chat-btn" id="newChatBtn" title="Novo chat">+</button>
+          <button class="toggle-sidebar-btn" id="toggleSidebarBtn" title="Recolher/Expandir">«</button>
+        </div>
+      </div>
+      <ul class="chat-history" id="chatHistory"></ul>
+    </aside>
+    <main class="chat-main">
+      <header class="chat-header">
+        <h1>Chat MCP</h1>
+      </header>
+      <section class="messages" id="messages"></section>
+      <form class="input-area" id="chatForm">
+        <input type="text" id="userInput" placeholder="Digite sua pergunta..." autocomplete="off" required />
+        <button type="submit" id="sendBtn">Enviar</button>
+      </form>
+    </main>
+  </div>
+  <script src="chat.js"></script>
+</body>
+</html>

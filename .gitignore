@@ -1,0 +1,5 @@
+# Ignorar diretórios e arquivos
+node_modules/
+*.log
+debug*
+!.gitignore
