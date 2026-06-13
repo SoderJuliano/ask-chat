@@ -192,13 +192,25 @@ body[data-theme="light"] .chat-main {
   box-shadow: -4px 0 16px rgba(44,62,80,0.06);
 }
 .chat-header {
-  padding: 22px 24px 12px 24px;
+  padding: 16px 24px;
   border-bottom: 1px solid #333;
   transition: border-color 0.3s;
 }
 
 body[data-theme="light"] .chat-header {
   border-bottom: 1px solid #eaeaea;
+}
+
+.header-title-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .chat-header h1 {
@@ -261,6 +273,7 @@ body[data-theme="light"] .bot .bubble {
 }
 .input-area {
   display: flex;
+  align-items: flex-end; /* Alinha o botão ao rodapé do textarea quando ele cresce */
   padding: 18px 24px;
   border-top: 1px solid #333;
   background: #1e1e1e;
@@ -282,6 +295,12 @@ body[data-theme="light"] .input-area {
   transition: border 0.2s;
   background: #2a2a2a;
   color: #e0e0e0;
+  resize: none;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+  font-family: inherit;
+  display: block; /* Garante que se comporte bem no flexbox */
 }
 
 body[data-theme="light"] #userInput {
@@ -308,6 +327,8 @@ body[data-theme="light"] #userInput:focus {
   cursor: pointer;
   font-weight: 500;
   transition: background 0.2s;
+  height: 42px; /* Altura fixa para o botão */
+  flex-shrink: 0; /* Garante que o botão não seja espremido */
 }
 #sendBtn:disabled {
   background: #b2ebfb;

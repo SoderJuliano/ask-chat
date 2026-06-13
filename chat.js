@@ -136,16 +136,91 @@ function updateSessionTitleIfNeeded(prompt) {
   }
 }
 
+async function summarizeContext(session) {
+  // Pega todas as mensagens após o último resumo (ou desde o início)
+  const messagesToSummarize = session.messages.slice(session.lastSummarizedIndex || 0);
+  if (messagesToSummarize.length === 0) return;
+
+  const summaryPrompt = `INSTRUÇÃO: Resuma a conversa abaixo para manter a memória do chat. 
+IMPORTANTE: Preserve nomes de ferramentas (ex: Ollama), modelos específicos, tecnologias e o objetivo atual do usuário.
+Limite o resumo a 5-8 linhas de forma densa e informativa.\n\n` +
+    messagesToSummarize.map(m => `${m.role === 'user' ? 'Usuário' : 'IA'}: ${m.content}`).join('\n');
+
+  try {
+    const response = await fetch(backendUrl + '/llama3', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: summaryPrompt, language: 'PORTUGUESE' })
+    });
+    
+    let summary = '';
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      summary = data.response;
+    } else {
+      summary = await response.text();
+    }
+
+    if (summary) {
+      // Atualiza o contexto acumulado
+      const oldSummary = session.contextSummary || '';
+      session.contextSummary = `Contexto anterior: ${oldSummary}\nNovo resumo: ${summary}`;
+      session.lastSummarizedIndex = session.messages.length;
+      saveSessions();
+    }
+  } catch (err) {
+    console.error('Erro ao resumir contexto:', err);
+  }
+}
+
 async function handleSendMessage(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   const input = document.getElementById('userInput');
   const prompt = input.value.trim();
   if (!prompt || !backendUrl) return;
   updateSessionTitleIfNeeded(prompt);
+  
   const session = sessions[activeSessionIndex];
+  
+  // Adiciona a mensagem do usuário
   session.messages.push({ role: 'user', content: prompt });
   renderMessages();
   input.value = '';
+  input.style.height = 'auto'; // Reseta altura após enviar
+  
+  // Instrução de Sistema para manter a IA no trilho
+  const systemDirective = "DIRETRIZ: Responda de forma direta e técnica. PRIORIZE ABSOLUTAMENTE as informações e tecnologias mencionadas no contexto e histórico abaixo. Se o usuário estiver falando de 'Ollama', não sugira ferramentas de terceiros como IBM ou Microsoft, a menos que solicitado.\n\n";
+
+  // Prepara o contexto para enviar
+  let contextPrompt = prompt;
+  if (session.contextSummary) {
+    // Garantimos que ao menos as últimas 2 mensagens (1 troca completa) 
+    // estejam presentes como "ponte", mesmo que já tenham sido resumidas.
+    const minHistoryCount = 2;
+    let startIndex = session.lastSummarizedIndex || 0;
+    
+    // Se houver menos de 2 mensagens desde o último resumo, retrocedemos para pegar a ponte
+    if ((session.messages.length - 1) - startIndex < minHistoryCount) {
+      startIndex = Math.max(0, (session.messages.length - 1) - minHistoryCount);
+    }
+
+    const recentMessages = session.messages.slice(startIndex, -1);
+    contextPrompt = `${systemDirective}MEMÓRIA DE LONGO PRAZO (RESUMO):\n${session.contextSummary}\n\nCONTIGUIDADE (HISTÓRICO RECENTE):\n`;
+    contextPrompt += recentMessages.map(m => `${m.role === 'user' ? 'Usuário' : 'IA'}: ${m.content}`).join('\n');
+    contextPrompt += `\n\nPERGUNTA ATUAL DO USUÁRIO: ${prompt}`;
+  } else {
+    // Se não tem resumo ainda, envia o histórico completo
+    const history = session.messages.slice(0, -1);
+    if (history.length > 0) {
+      contextPrompt = `${systemDirective}HISTÓRICO DA CONVERSA:\n`;
+      contextPrompt += history.map(m => `${m.role === 'user' ? 'Usuário' : 'IA'}: ${m.content}`).join('\n');
+      contextPrompt += `\n\nPERGUNTA ATUAL DO USUÁRIO: ${prompt}`;
+    } else {
+      contextPrompt = `${systemDirective}${prompt}`;
+    }
+  }
+
   // "Digitando..."
   session.messages.push({ role: 'bot', content: 'Digitando...' });
   renderMessages();
@@ -154,7 +229,7 @@ async function handleSendMessage(e) {
     const response = await fetch(backendUrl + '/llama3', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, language: 'PORTUGUESE' })
+      body: JSON.stringify({ prompt: contextPrompt, language: 'PORTUGUESE' })
     });
     const contentType = response.headers.get('content-type');
     let botResponse = '';
@@ -173,8 +248,20 @@ async function handleSendMessage(e) {
     } else {
       session.messages.push({ role: 'bot', content: 'Erro: resposta vazia.' });
     }
+    
     saveSessions();
     renderMessages();
+
+    // Verifica se atingiu 5 respostas (cada troca user/bot conta como 1 resposta do bot)
+    // Contamos o número de mensagens do bot desde o último resumo
+    const botMessagesSinceLastSummary = session.messages
+      .slice(session.lastSummarizedIndex || 0)
+      .filter(m => m.role === 'bot').length;
+
+    if (botMessagesSinceLastSummary >= 5) {
+      await summarizeContext(session);
+    }
+
   } catch (err) {
     session.messages.pop();
     session.messages.push({ role: 'bot', content: 'Erro ao conectar ao backend.' });
@@ -190,6 +277,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderMessages();
   }
   await fetchBackendUrl();
+  
+  const userInput = document.getElementById('userInput');
+  
+  // Auto-ajuste da altura do textarea
+  userInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+  });
+
+  // Tecla Enter para enviar, Shift+Enter para nova linha
+  userInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  });
+
   document.getElementById('chatForm').onsubmit = handleSendMessage;
   document.getElementById('newChatBtn').onclick = () => {
     createNewSession();
