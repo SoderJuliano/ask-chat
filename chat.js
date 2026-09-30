@@ -1,5 +1,6 @@
 const LOCALSTORAGE_KEY = 'mcp_chat_sessions_v1';
 const THEME_KEY = 'mcp_chat_theme';
+const MODEL_KEY = 'mcp_chat_selected_model';
 let backendUrl = '';
 let sessions = [];
 let activeSessionIndex = 0;
@@ -10,6 +11,11 @@ function uuidv4() {
     const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+function getSelectedEndpoint() {
+  const select = document.getElementById('modelSelect');
+  return select ? select.value : '/llama3-rag';
 }
 
 async function fetchBackendUrl() {
@@ -225,8 +231,10 @@ async function handleSendMessage(e) {
   session.messages.push({ role: 'bot', content: 'Digitando...' });
   renderMessages();
 
+  const endpoint = getSelectedEndpoint();
+
   try {
-    const response = await fetch(backendUrl + '/llama3', {
+    const response = await fetch(backendUrl + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: contextPrompt, language: 'PORTUGUESE' })
@@ -305,8 +313,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.body.setAttribute('data-theme', savedTheme);
   updateThemeToggleIcon(savedTheme);
   
-  // Adiciona evento ao botão de toggle
+  // Adiciona evento ao botão de toggle do tema
   document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+  // Inicializa a seleção de modelo
+  const modelSelect = document.getElementById('modelSelect');
+  if (modelSelect) {
+    const savedModel = localStorage.getItem(MODEL_KEY) || '/llama3-rag';
+    modelSelect.value = savedModel;
+    modelSelect.addEventListener('change', (e) => {
+      localStorage.setItem(MODEL_KEY, e.target.value);
+    });
+  }
   
   // Restaura o estado da sidebar
   const sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';

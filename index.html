@@ -27,6 +27,16 @@
           <img src="chat.png" alt="Chat Icon" class="header-icon">
           <h1>Ask-chat</h1>
         </div>
+        <div class="header-controls">
+          <label for="modelSelect" class="model-select-label">Modelo:</label>
+          <select id="modelSelect" class="model-select" title="Selecione o modelo ou endpoint">
+            <option value="/llama3-rag" selected>⚡ Llama 3 + RAG (Java 17-27 & Spring)</option>
+            <option value="/llama3">🦙 Llama 3 (Padrão)</option>
+            <option value="/llamatiny">🦙 TinyLlama</option>
+            <option value="/gemma3">💎 Gemma 3</option>
+            <option value="/qwen25">🤖 Qwen 2.5</option>
+          </select>
+        </div>
       </header>
       <section class="messages" id="messages"></section>
       <form class="input-area" id="chatForm">
