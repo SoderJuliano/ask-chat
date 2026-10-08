@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Helper Node Remote // Ask-Chat</title>
+  <link rel="icon" type="image/png" href="chat.png">
+  <link rel="stylesheet" href="server.css">
+  <!-- Ably Realtime Client Library v2 -->
+  <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+</head>
+<body data-theme="dark">
+  <div class="remote-app">
+    <!-- Header Fixo de Status -->
+    <header class="remote-header">
+      <div class="header-left">
+        <div class="app-logo">
+          <img src="chat.png" alt="Helper Node Logo" class="logo-img">
+          <div class="logo-text">
+            <h1>Helper Node</h1>
+            <span class="sub-badge">REMOTE COPILOT</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div id="connection-status" class="status-pill status-connecting">
+          <span class="status-dot"></span>
+          <span id="status-label">Conectando...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Barra de Navegação entre Modos -->
+    <nav class="mode-tabs">
+      <button type="button" class="tab-btn active" data-tab="tab-realtime">
+        <span class="tab-icon">🎧</span>
+        <span class="tab-title">Tempo Real</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-translation">
+        <span class="tab-icon">🌐</span>
+        <span class="tab-title">Tradução</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-profile">
+        <span class="tab-icon">👤</span>
+        <span class="tab-title">Cases & CV</span>
+      </button>
+    </nav>
+
+    <!-- Controles Rápidos -->
+    <div class="quick-controls">
+      <div class="controls-left">
+        <button id="btn-toggle-assistant" class="control-btn action-primary" title="Iniciar ou pausar escuta">
+          <span id="toggle-icon">▶️</span>
+          <span id="toggle-label">Iniciar</span>
+        </button>
+        <button id="btn-clear-stream" class="control-btn action-secondary" title="Limpar histórico da tela">
+          <span>🧹</span>
+          <span>Limpar</span>
+        </button>
+      </div>
+      <div class="controls-right">
+        <div id="audio-vu-meter" class="vu-meter" title="Volume do áudio em tempo real">
+          <div class="vu-bar" id="vu-bar-level"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <main class="remote-main">
+      <!-- ABA 1: ASSISTENTE EM TEMPO REAL -->
+      <section id="tab-realtime" class="tab-content active">
+        <div id="realtime-stream-list" class="stream-list">
+          <div class="empty-placeholder" id="realtime-empty">
+            <div class="placeholder-icon">🎧</div>
+            <h3>Assistente em Tempo Real</h3>
+            <p>Aguardando fala ou pergunta do interlocutor/sistema...</p>
+            <span class="hint-text">As transcrições e respostas da IA aparecerão aqui instantaneamente.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 2: ASSISTENTE DE TRADUÇÃO -->
+      <section id="tab-translation" class="tab-content">
+        <div id="translation-stream-list" class="stream-list">
+          <div class="empty-placeholder" id="translation-empty">
+            <div class="placeholder-icon">🌐</div>
+            <h3>Assistente de Tradução</h3>
+            <p>Ouvindo áudio do sistema e microfone...</p>
+            <span class="hint-text">Traduções live e pontos-chave de respostas serão exibidos aqui.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 3: CASES TÉCNICOS & CV JULIANO SODER -->
+      <section id="tab-profile" class="tab-content">
+        <div class="profile-cards-container">
+          <!-- Elevator Pitch -->
+          <div class="profile-card highlight-card">
+            <div class="card-header">
+              <span class="card-tag">PITCH PESSOAL</span>
+              <h4>Apresentação em Inglês (30s)</h4>
+            </div>
+            <p class="card-text en-text">
+              "I am a Senior Software Engineer with strong experience in backend Java, Spring Boot, microservices, and Kafka, as well as Python, Node.js, and Angular. At Casas Bahia, I worked on migrations from legacy COBOL and IBM to Java, Mongo, and Kafka, solving high-concurrency issues, building ETL pipelines in Python, and creating internal Electron tools. I like to build simple, fast, and reliable software."
+            </p>
+          </div>
+
+          <!-- Case 1: Kafka & Concorrência -->
+          <div class="profile-card">
+            <div class="card-header">
+              <span class="card-tag">CASE 1 // BACKEND & KAFKA</span>
+              <h4>Resolução de Concorrência e Duplicidade no Kafka</h4>
+            </div>
+            <div class="card-body">
+              <p><strong>Cenário:</strong> Migração de COBOL/IBM DB para Java + MongoDB na Casas Bahia. Triggers no IBM postavam em múltiplos tópicos simultâneos gerando concorrência e duplicidade.</p>
+              <p><strong>Solução:</strong> Pipeline intermediário agrupando e particionando por chave de entidade (Entity Key), sequenciando eventos antes do MongoDB.</p>
+              <div class="card-en-pitch">
+                <em>"Database triggers sent many updates to Kafka at once causing race conditions in Mongo. I fixed this by partitioning by entity key and reordering events before saving."</em>
+              </div>
+            </div>
+          </div>
+
+          <!-- Case 2: ETL Python -->
+          <div class="profile-card">
+            <div class="card-header">
+              <span class="card-tag">CASE 2 // PYTHON & DATA</span>
+              <h4>Reescrita de Pipeline de ETL (Oracle ➔ Mongo)</h4>
+            </div>
+            <div class="card-body">
+              <p><strong>Cenário:</strong> Atualização de versão do MongoDB quebrou o ETL legado em framework antigo.</p>
+              <p><strong>Solução:</strong> Reescrita completa do zero em Python com drivers LTS, estável com zero downtime e sincronização contínua.</p>
+              <div class="card-en-pitch">
+                <em>"I rewrote the critical ETL from scratch in Python with LTS official drivers, ensuring 100% stability and zero downtime."</em>
+              </div>
+            </div>
+          </div>
+
+          <!-- Case 3: Electron DevTools -->
+          <div class="profile-card">
+            <div class="card-header">
+              <span class="card-tag">CASE 3 // INOVAÇÃO & TOOLING</span>
+              <h4>DevTools em Electron para Micro-frontends Angular</h4>
+            </div>
+            <div class="card-body">
+              <p><strong>Cenário:</strong> Mais de 10 micro-frontends Angular exigiam subir 3+ projetos manualmente, configurar Nexus e terminais.</p>
+              <p><strong>Solução:</strong> App desktop em Electron com 1 clique para baixar dependências, autenticar tokens do Nexus e rodar com logs divididos.</p>
+              <div class="card-en-pitch">
+                <em>"I built an Electron desktop tool that with one click manages company tokens and launches all micro-frontends with split terminal logs."</em>
+              </div>
+            </div>
+          </div>
+
+          <!-- Soft Skills (STAR) -->
+          <div class="profile-card">
+            <div class="card-header">
+              <span class="card-tag">BEHAVIORAL // STAR</span>
+              <h4>Situações Comportamentais</h4>
+            </div>
+            <div class="card-body">
+              <ul class="star-list">
+                <li><strong>Prazos Curtos & Escopo Vago:</strong> Alinho com PM e dev antigo para fechar MVP essencial rápido; crio tickets para débitos depois.</li>
+                <li><strong>Tomada de Decisão:</strong> Iniciativa própria ao criar o DevTools Electron para produtividade do time.</li>
+                <li><strong>Liderança Técnica:</strong> Assumi condução do refinamento técnico nas ausências do Tech Lead; bagagem de 7 anos como líder em fábrica.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Flutuante com Alerta de Notificação -->
+    <footer class="remote-footer">
+      <span id="footer-connection-info">Helper Node Remote v1.0 • Seguro & Sem Atraso</span>
+    </footer>
+  </div>
+
+  <script src="server.js"></script>
+</body>
+</html>
