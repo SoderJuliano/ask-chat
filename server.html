@@ -2,177 +2,146 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Helper Node Remote // Ask-Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Helper Node Remoto // Ask-chat</title>
   <link rel="icon" type="image/png" href="chat.png">
+  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="server.css">
   <!-- Ably Realtime Client Library v2 -->
   <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
 </head>
 <body data-theme="dark">
-  <div class="remote-app">
-    <!-- Header Fixo de Status -->
-    <header class="remote-header">
-      <div class="header-left">
-        <div class="app-logo">
-          <img src="chat.png" alt="Helper Node Logo" class="logo-img">
-          <div class="logo-text">
-            <h1>Helper Node</h1>
-            <span class="sub-badge">REMOTE COPILOT</span>
+  <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+  <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="Expandir sidebar">»</button>
+  
+  <div class="app-container">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Modos Remotos</h2>
+        <div class="header-buttons">
+          <button class="toggle-sidebar-btn" id="toggleSidebarBtn" title="Recolher/Expandir">«</button>
+        </div>
+      </div>
+      <ul class="chat-history" id="remoteModeList">
+        <li class="active" data-mode="realtime">
+          <div class="mode-item-title">Assistente em Tempo Real</div>
+          <div class="mode-item-desc">Transcrições e sugestões de IA</div>
+        </li>
+        <li data-mode="translation">
+          <div class="mode-item-title">Assistente de Tradução</div>
+          <div class="mode-item-desc">Tradução live inglês / português</div>
+        </li>
+        <li data-mode="profile">
+          <div class="mode-item-title">Cases Técnicos & CV</div>
+          <div class="mode-item-desc">Juliano Soder (Kafka, ETL, STAR)</div>
+        </li>
+        <li class="nav-back-chat" id="btnBackChat">
+          <div class="mode-item-title">Voltar ao Ask-Chat</div>
+          <div class="mode-item-desc">Chat manual com IA</div>
+        </li>
+      </ul>
+    </aside>
+
+    <main class="chat-main">
+      <header class="chat-header">
+        <div class="header-title-container">
+          <img src="chat.png" alt="Helper Node Icon" class="header-icon">
+          <div>
+            <h1 id="remoteViewTitle">Copiloto em Tempo Real</h1>
+            <span class="remote-sub-label">Helper Node Daemon // Remoto</span>
           </div>
         </div>
-      </div>
-
-      <div class="header-right">
-        <div id="connection-status" class="status-pill status-connecting">
-          <span class="status-dot"></span>
-          <span id="status-label">Conectando...</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Barra de Navegação entre Modos -->
-    <nav class="mode-tabs">
-      <button type="button" class="tab-btn active" data-tab="tab-realtime">
-        <span class="tab-icon">🎧</span>
-        <span class="tab-title">Tempo Real</span>
-      </button>
-      <button type="button" class="tab-btn" data-tab="tab-translation">
-        <span class="tab-icon">🌐</span>
-        <span class="tab-title">Tradução</span>
-      </button>
-      <button type="button" class="tab-btn" data-tab="tab-profile">
-        <span class="tab-icon">👤</span>
-        <span class="tab-title">Cases & CV</span>
-      </button>
-    </nav>
-
-    <!-- Controles Rápidos -->
-    <div class="quick-controls">
-      <div class="controls-left">
-        <button id="btn-toggle-assistant" class="control-btn action-primary" title="Iniciar ou pausar escuta">
-          <span id="toggle-icon">▶️</span>
-          <span id="toggle-label">Iniciar</span>
-        </button>
-        <button id="btn-clear-stream" class="control-btn action-secondary" title="Limpar histórico da tela">
-          <span>🧹</span>
-          <span>Limpar</span>
-        </button>
-      </div>
-      <div class="controls-right">
-        <div id="audio-vu-meter" class="vu-meter" title="Volume do áudio em tempo real">
-          <div class="vu-bar" id="vu-bar-level"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Conteúdo Principal -->
-    <main class="remote-main">
-      <!-- ABA 1: ASSISTENTE EM TEMPO REAL -->
-      <section id="tab-realtime" class="tab-content active">
-        <div id="realtime-stream-list" class="stream-list">
-          <div class="empty-placeholder" id="realtime-empty">
-            <div class="placeholder-icon">🎧</div>
-            <h3>Assistente em Tempo Real</h3>
-            <p>Aguardando fala ou pergunta do interlocutor/sistema...</p>
-            <span class="hint-text">As transcrições e respostas da IA aparecerão aqui instantaneamente.</span>
+        
+        <div class="header-controls">
+          <div id="connectionStatusBadge" class="remote-status-badge status-connecting">
+            <span class="status-indicator-dot"></span>
+            <span id="connectionStatusText">Conectando...</span>
           </div>
+          <button type="button" class="action-btn-clean" id="btnToggleListening" title="Pausar/Retomar escuta">
+            <svg id="svgListenIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span id="lblListenText">Iniciar</span>
+          </button>
+          <button type="button" class="action-btn-clean" id="btnClearMessages" title="Limpar mensagens da tela">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>Limpar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Seção de Mensagens / Streaming -->
+      <section class="messages" id="remoteMessages">
+        <div class="empty-state" id="emptyStatePlaceholder">
+          <div class="empty-state-title">Aguardando áudio do sistema ou microfone</div>
+          <div class="empty-state-subtitle">As falas do interlocutor e respostas da IA serão transmitidas em tempo real aqui.</div>
         </div>
       </section>
 
-      <!-- ABA 2: ASSISTENTE DE TRADUÇÃO -->
-      <section id="tab-translation" class="tab-content">
-        <div id="translation-stream-list" class="stream-list">
-          <div class="empty-placeholder" id="translation-empty">
-            <div class="placeholder-icon">🌐</div>
-            <h3>Assistente de Tradução</h3>
-            <p>Ouvindo áudio do sistema e microfone...</p>
-            <span class="hint-text">Traduções live e pontos-chave de respostas serão exibidos aqui.</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ABA 3: CASES TÉCNICOS & CV JULIANO SODER -->
-      <section id="tab-profile" class="tab-content">
-        <div class="profile-cards-container">
-          <!-- Elevator Pitch -->
-          <div class="profile-card highlight-card">
-            <div class="card-header">
-              <span class="card-tag">PITCH PESSOAL</span>
-              <h4>Apresentação em Inglês (30s)</h4>
-            </div>
-            <p class="card-text en-text">
+      <!-- Seção de Perfil / Cases (Visível apenas na aba profile) -->
+      <section class="messages" id="profileCheatsheet" style="display:none;">
+        <div class="profile-cards-list">
+          <div class="profile-cheatsheet-card">
+            <div class="cheatsheet-tag">ELEVATOR PITCH (INGLÊS)</div>
+            <h3>Apresentação Pessoal (30 segundos)</h3>
+            <p class="pitch-quote">
               "I am a Senior Software Engineer with strong experience in backend Java, Spring Boot, microservices, and Kafka, as well as Python, Node.js, and Angular. At Casas Bahia, I worked on migrations from legacy COBOL and IBM to Java, Mongo, and Kafka, solving high-concurrency issues, building ETL pipelines in Python, and creating internal Electron tools. I like to build simple, fast, and reliable software."
             </p>
           </div>
 
-          <!-- Case 1: Kafka & Concorrência -->
-          <div class="profile-card">
-            <div class="card-header">
-              <span class="card-tag">CASE 1 // BACKEND & KAFKA</span>
-              <h4>Resolução de Concorrência e Duplicidade no Kafka</h4>
-            </div>
-            <div class="card-body">
-              <p><strong>Cenário:</strong> Migração de COBOL/IBM DB para Java + MongoDB na Casas Bahia. Triggers no IBM postavam em múltiplos tópicos simultâneos gerando concorrência e duplicidade.</p>
-              <p><strong>Solução:</strong> Pipeline intermediário agrupando e particionando por chave de entidade (Entity Key), sequenciando eventos antes do MongoDB.</p>
-              <div class="card-en-pitch">
-                <em>"Database triggers sent many updates to Kafka at once causing race conditions in Mongo. I fixed this by partitioning by entity key and reordering events before saving."</em>
-              </div>
+          <div class="profile-cheatsheet-card">
+            <div class="cheatsheet-tag">CASE 1 // KAFKA & CONCORRÊNCIA</div>
+            <h3>Resolução de Concorrência e Duplicidade no Kafka</h3>
+            <p><strong>Cenário:</strong> Migração de COBOL/IBM para Java + MongoDB na Casas Bahia. Triggers no IBM postavam atualizações simultâneas gerando concorrência (race conditions) e duplicidade no Mongo.</p>
+            <p><strong>Solução:</strong> Pipeline com tópico interno agrupando por Entity Key e reordenando eventos sequencialmente antes da escrita final.</p>
+            <div class="card-pitch-snippet">
+              "Database triggers sent many updates to Kafka at once causing race conditions. I fixed this by partitioning by entity key and reordering events before saving."
             </div>
           </div>
 
-          <!-- Case 2: ETL Python -->
-          <div class="profile-card">
-            <div class="card-header">
-              <span class="card-tag">CASE 2 // PYTHON & DATA</span>
-              <h4>Reescrita de Pipeline de ETL (Oracle ➔ Mongo)</h4>
-            </div>
-            <div class="card-body">
-              <p><strong>Cenário:</strong> Atualização de versão do MongoDB quebrou o ETL legado em framework antigo.</p>
-              <p><strong>Solução:</strong> Reescrita completa do zero em Python com drivers LTS, estável com zero downtime e sincronização contínua.</p>
-              <div class="card-en-pitch">
-                <em>"I rewrote the critical ETL from scratch in Python with LTS official drivers, ensuring 100% stability and zero downtime."</em>
-              </div>
+          <div class="profile-cheatsheet-card">
+            <div class="cheatsheet-tag">CASE 2 // PYTHON & ETL</div>
+            <h3>Reescrita de Pipeline de ETL (Oracle para MongoDB)</h3>
+            <p><strong>Cenário:</strong> Atualização de versão do MongoDB quebrou o ETL legado.</p>
+            <p><strong>Solução:</strong> Reescrita completa do zero em Python com drivers LTS oficiais, estável e com zero downtime.</p>
+            <div class="card-pitch-snippet">
+              "Our old ETL broke after a MongoDB update. I rewrote the whole ETL in Python from scratch with zero downtime."
             </div>
           </div>
 
-          <!-- Case 3: Electron DevTools -->
-          <div class="profile-card">
-            <div class="card-header">
-              <span class="card-tag">CASE 3 // INOVAÇÃO & TOOLING</span>
-              <h4>DevTools em Electron para Micro-frontends Angular</h4>
-            </div>
-            <div class="card-body">
-              <p><strong>Cenário:</strong> Mais de 10 micro-frontends Angular exigiam subir 3+ projetos manualmente, configurar Nexus e terminais.</p>
-              <p><strong>Solução:</strong> App desktop em Electron com 1 clique para baixar dependências, autenticar tokens do Nexus e rodar com logs divididos.</p>
-              <div class="card-en-pitch">
-                <em>"I built an Electron desktop tool that with one click manages company tokens and launches all micro-frontends with split terminal logs."</em>
-              </div>
+          <div class="profile-cheatsheet-card">
+            <div class="cheatsheet-tag">CASE 3 // INOVAÇÃO INTERNA</div>
+            <h3>DevTools Desktop em Electron para Micro-frontends</h3>
+            <p><strong>Cenário:</strong> Mais de 10 micro-frontends Angular exigiam setup manual demorado e autenticação no Nexus.</p>
+            <p><strong>Solução:</strong> Aplicação Electron própria para baixar dependências, autenticar tokens e subir projetos com abas de terminais integradas.</p>
+            <div class="card-pitch-snippet">
+              "I built an internal Electron desktop tool. With one click, it handles tokens, installs packages, and runs all projects with split terminal logs."
             </div>
           </div>
 
-          <!-- Soft Skills (STAR) -->
-          <div class="profile-card">
-            <div class="card-header">
-              <span class="card-tag">BEHAVIORAL // STAR</span>
-              <h4>Situações Comportamentais</h4>
-            </div>
-            <div class="card-body">
-              <ul class="star-list">
-                <li><strong>Prazos Curtos & Escopo Vago:</strong> Alinho com PM e dev antigo para fechar MVP essencial rápido; crio tickets para débitos depois.</li>
-                <li><strong>Tomada de Decisão:</strong> Iniciativa própria ao criar o DevTools Electron para produtividade do time.</li>
-                <li><strong>Liderança Técnica:</strong> Assumi condução do refinamento técnico nas ausências do Tech Lead; bagagem de 7 anos como líder em fábrica.</li>
-              </ul>
-            </div>
+          <div class="profile-cheatsheet-card">
+            <div class="cheatsheet-tag">SOFT SKILLS // SITUAÇÕES STAR</div>
+            <h3>Prazos Curtos, Liderança e Tomada de Decisão</h3>
+            <ul class="cheatsheet-list">
+              <li><strong>Prazos Curtos & Escopo Vago:</strong> Alinho com PM e desenvolvedor de referência para fechar MVP essencial; crio tickets para débitos depois.</li>
+              <li><strong>Tomada de Decisão Própria:</strong> Criação do DevTools Electron fora do expediente para resolver gargalo de produtividade da equipe.</li>
+              <li><strong>Liderança Técnica:</strong> Condução de refinamentos técnicos na ausência do Tech Lead; 7 anos de liderança prévia em ambiente industrial.</li>
+            </ul>
           </div>
         </div>
       </section>
-    </main>
 
-    <!-- Footer Flutuante com Alerta de Notificação -->
-    <footer class="remote-footer">
-      <span id="footer-connection-info">Helper Node Remote v1.0 • Seguro & Sem Atraso</span>
-    </footer>
+      <!-- Rodapé / Barra de Status de Áudio -->
+      <div class="remote-bottom-bar">
+        <div class="vu-meter-container">
+          <span class="vu-label">Sinal de Áudio:</span>
+          <div class="vu-meter-track">
+            <div class="vu-meter-fill" id="vuMeterFill"></div>
+          </div>
+        </div>
+        <span class="remote-host-info" id="remoteHostInfo">Helper Node Daemon Ativo • Conexão P2P/Ably</span>
+      </div>
+    </main>
   </div>
 
   <script src="server.js"></script>

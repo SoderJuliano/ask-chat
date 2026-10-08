@@ -9,84 +9,122 @@
   
   let ablyClient = null;
   let streamChannel = null;
-  let isHostConnected = false;
-  let activeTab = 'tab-realtime';
-  let isAssistantActive = false;
+  let currentMode = 'realtime'; // 'realtime' | 'translation' | 'profile'
+  let isAssistantListening = false;
 
-  const turnsMap = new Map(); // id -> DOMElement
+  const turnsMap = new Map(); // id -> { userEl, botEl }
 
   // Elementos do DOM
-  const statusPill = document.getElementById('connection-status');
-  const statusLabel = document.getElementById('status-label');
-  const vuBar = document.getElementById('vu-bar-level');
-  const toggleBtn = document.getElementById('btn-toggle-assistant');
-  const toggleIcon = document.getElementById('toggle-icon');
-  const toggleLabel = document.getElementById('toggle-label');
-  const clearBtn = document.getElementById('btn-clear-stream');
-  const realtimeList = document.getElementById('realtime-stream-list');
-  const translationList = document.getElementById('translation-stream-list');
-  const realtimeEmpty = document.getElementById('realtime-empty');
-  const translationEmpty = document.getElementById('translation-empty');
-  const tabButtons = document.querySelectorAll('.tab-btn');
+  const themeToggle = document.getElementById('themeToggle');
+  const sidebar = document.getElementById('sidebar');
+  const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+  const sidebarExpandBtn = document.getElementById('sidebarExpandBtn');
+  const modeList = document.getElementById('remoteModeList');
+  const viewTitle = document.getElementById('remoteViewTitle');
+  const statusBadge = document.getElementById('connectionStatusBadge');
+  const statusText = document.getElementById('connectionStatusText');
+  const btnToggleListening = document.getElementById('btnToggleListening');
+  const lblListenText = document.getElementById('lblListenText');
+  const btnClearMessages = document.getElementById('btnClearMessages');
+  const remoteMessages = document.getElementById('remoteMessages');
+  const profileCheatsheet = document.getElementById('profileCheatsheet');
+  const emptyStatePlaceholder = document.getElementById('emptyStatePlaceholder');
+  const vuMeterFill = document.getElementById('vuMeterFill');
+  const btnBackChat = document.getElementById('btnBackChat');
 
-  // Inicialização de Abas
-  tabButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tabButtons.forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
-      btn.classList.add('active');
-      activeTab = btn.getAttribute('data-tab');
-      const targetContent = document.getElementById(activeTab);
-      if (targetContent) targetContent.classList.add('active');
+  // Gerenciamento de Tema (Dark / Light)
+  const savedTheme = localStorage.getItem('mcp_chat_theme') || 'dark';
+  document.body.setAttribute('data-theme', savedTheme);
+
+  themeToggle?.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('mcp_chat_theme', nextTheme);
+  });
+
+  // Sidebar Toggle
+  function toggleSidebar() {
+    sidebar?.classList.toggle('collapsed');
+    const isCollapsed = sidebar?.classList.contains('collapsed');
+    if (sidebarExpandBtn) {
+      if (isCollapsed) sidebarExpandBtn.classList.add('show');
+      else sidebarExpandBtn.classList.remove('show');
+    }
+  }
+
+  toggleSidebarBtn?.addEventListener('click', toggleSidebar);
+  sidebarExpandBtn?.addEventListener('click', toggleSidebar);
+
+  // Voltar ao chat principal
+  btnBackChat?.addEventListener('click', () => {
+    window.location.href = '/';
+  });
+
+  // Seleção de Modos na Sidebar
+  modeList?.querySelectorAll('li[data-mode]').forEach((item) => {
+    item.addEventListener('click', () => {
+      modeList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+      item.classList.add('active');
+      currentMode = item.getAttribute('data-mode');
+      updateModeView(currentMode);
     });
   });
 
-  // Limpar histórico na tela
-  clearBtn?.addEventListener('click', () => {
-    if (realtimeList) {
-      realtimeList.querySelectorAll('.bubble-turn').forEach(el => el.remove());
-      if (realtimeEmpty) realtimeEmpty.style.display = 'block';
+  function updateModeView(mode) {
+    if (mode === 'profile') {
+      if (viewTitle) viewTitle.textContent = 'Cases Técnicos & CV // Juliano Soder';
+      if (remoteMessages) remoteMessages.style.display = 'none';
+      if (profileCheatsheet) profileCheatsheet.style.display = 'flex';
+      if (btnToggleListening) btnToggleListening.style.display = 'none';
+    } else if (mode === 'translation') {
+      if (viewTitle) viewTitle.textContent = 'Assistente de Tradução Simultânea';
+      if (remoteMessages) remoteMessages.style.display = 'flex';
+      if (profileCheatsheet) profileCheatsheet.style.display = 'none';
+      if (btnToggleListening) btnToggleListening.style.display = 'inline-flex';
+      checkEmptyState();
+    } else {
+      if (viewTitle) viewTitle.textContent = 'Copiloto em Tempo Real';
+      if (remoteMessages) remoteMessages.style.display = 'flex';
+      if (profileCheatsheet) profileCheatsheet.style.display = 'none';
+      if (btnToggleListening) btnToggleListening.style.display = 'inline-flex';
+      checkEmptyState();
     }
-    if (translationList) {
-      translationList.querySelectorAll('.bubble-turn').forEach(el => el.remove());
-      if (translationEmpty) translationEmpty.style.display = 'block';
+  }
+
+  function checkEmptyState() {
+    const hasMessages = remoteMessages && remoteMessages.querySelectorAll('.message').length > 0;
+    if (emptyStatePlaceholder) {
+      emptyStatePlaceholder.style.display = hasMessages ? 'none' : 'block';
+    }
+  }
+
+  // Limpar Mensagens
+  btnClearMessages?.addEventListener('click', () => {
+    if (remoteMessages) {
+      remoteMessages.querySelectorAll('.message').forEach(m => m.remove());
     }
     turnsMap.clear();
+    checkEmptyState();
   });
 
-  // Botão de alternar Assistente (Comando Remoto)
-  toggleBtn?.addEventListener('click', () => {
+  // Alternar Escuta
+  btnToggleListening?.addEventListener('click', () => {
     if (!streamChannel) return;
-    const action = activeTab === 'tab-translation' ? 'toggle_translation' : 'toggle_realtime';
+    const action = currentMode === 'translation' ? 'toggle_translation' : 'toggle_realtime';
     streamChannel.publish('client-command', { action, timestamp: Date.now() });
-    
-    // Feedback visual imediato
-    isAssistantActive = !isAssistantActive;
-    updateAssistantToggleUI(isAssistantActive);
+
+    isAssistantListening = !isAssistantListening;
+    if (lblListenText) lblListenText.textContent = isAssistantListening ? 'Pausar' : 'Iniciar';
   });
 
-  function updateAssistantToggleUI(active) {
-    if (toggleIcon) toggleIcon.textContent = active ? '⏸️' : '▶️';
-    if (toggleLabel) toggleLabel.textContent = active ? 'Pausar' : 'Iniciar';
-    if (toggleBtn) {
-      if (active) {
-        toggleBtn.classList.remove('action-primary');
-        toggleBtn.classList.add('action-secondary');
-      } else {
-        toggleBtn.classList.remove('action-secondary');
-        toggleBtn.classList.add('action-primary');
-      }
-    }
+  function setStatus(type, text) {
+    if (!statusBadge || !statusText) return;
+    statusBadge.className = 'remote-status-badge status-' + type;
+    statusText.textContent = text;
   }
 
-  function setConnectionStatus(state, label) {
-    if (!statusPill || !statusLabel) return;
-    statusPill.className = 'status-pill status-' + state;
-    statusLabel.textContent = label;
-  }
-
-  // Busca a chave do Ably dinamicamente
+  // Busca chave Ably
   async function fetchAblyKey() {
     try {
       const resp = await fetch(ABLY_KEY_URL);
@@ -105,24 +143,23 @@
     return null;
   }
 
-  // Conecta ao Ably e inscreve nos canais
+  // Inicializa Ably
   async function initAbly() {
-    setConnectionStatus('connecting', 'Conectando...');
+    setStatus('connecting', 'Conectando...');
 
     const apiKey = await fetchAblyKey();
     if (!apiKey) {
-      setConnectionStatus('offline', 'Chave não encontrada');
+      setStatus('offline', 'Chave não encontrada');
       return;
     }
 
     try {
       if (typeof window.Ably === 'undefined') {
-        console.error('[AskChat-Server] SDK do Ably não carregado no navegador.');
-        setConnectionStatus('offline', 'Erro no SDK');
+        setStatus('offline', 'SDK Indisponível');
         return;
       }
 
-      const clientId = `client_remote_${Math.random().toString(36).substring(2, 8)}`;
+      const clientId = `ask_client_${Math.random().toString(36).substring(2, 8)}`;
       ablyClient = new window.Ably.Realtime({
         key: apiKey,
         clientId: clientId,
@@ -131,29 +168,25 @@
       });
 
       ablyClient.connection.on('connected', () => {
-        console.log('[AskChat-Server] Conectado ao Ably Realtime!');
-        setConnectionStatus('online', '🟢 Helper Node Online');
+        setStatus('online', 'Helper Node Online');
       });
 
       ablyClient.connection.on('disconnected', () => {
-        setConnectionStatus('connecting', 'Reconectando...');
+        setStatus('connecting', 'Reconectando...');
       });
 
       ablyClient.connection.on('failed', () => {
-        setConnectionStatus('offline', '🔴 Desconectado');
+        setStatus('offline', 'Desconectado');
       });
 
       streamChannel = ablyClient.channels.get(CHANNEL_NAME);
       await streamChannel.attach();
 
-      // Monitora presença do host (Helper Node)
       streamChannel.presence.subscribe((msg) => {
         streamChannel.presence.get((err, members) => {
           if (!err && members) {
             const hasHost = members.some(m => m.data?.role === 'host' || m.clientId?.startsWith('host_'));
-            if (hasHost) {
-              setConnectionStatus('online', '🟢 Helper Node Online');
-            }
+            if (hasHost) setStatus('online', 'Helper Node Online');
           }
         });
       });
@@ -163,178 +196,179 @@
         userAgent: navigator.userAgent
       });
 
-      // 1. Escuta eventos do Assistente em Tempo Real
+      // Eventos do Realtime Assistant
       streamChannel.subscribe('realtime-update', (msg) => {
-        handleRealtimeUpdate(msg.data);
+        handleRealtimeEvent(msg.data);
       });
 
-      // 2. Escuta eventos do Assistente de Tradução
+      // Eventos do Translation Assistant
       streamChannel.subscribe('translation-result', (msg) => {
-        handleTranslationResult(msg.data);
+        handleTranslationEvent(msg.data);
       });
 
-      // 3. Escuta nível de áudio (VU Meter)
+      // Nível de Áudio
       streamChannel.subscribe('translation-level', (msg) => {
         if (msg.data && typeof msg.data.rms === 'number') {
-          updateVuMeter(msg.data.rms);
+          updateVu(msg.data.rms);
         }
       });
 
-      // 4. Escuta status geral do Host
+      // Status do Host
       streamChannel.subscribe('host-status', (msg) => {
-        handleHostStatus(msg.data);
+        if (msg.data) {
+          if (msg.data.realtimeActive || msg.data.translationActive) {
+            isAssistantListening = true;
+            if (lblListenText) lblListenText.textContent = 'Pausar';
+          } else {
+            isAssistantListening = false;
+            if (lblListenText) lblListenText.textContent = 'Iniciar';
+          }
+        }
       });
 
-      // Solicita status atual ao host
       streamChannel.publish('client-command', { action: 'get_status' });
 
     } catch (err) {
-      console.error('[AskChat-Server] Falha ao inicializar Ably:', err);
-      setConnectionStatus('offline', 'Falha na conexão');
+      console.error('[AskChat-Server] Erro Ably:', err);
+      setStatus('offline', 'Falha na conexão');
     }
   }
 
-  function updateVuMeter(rms) {
-    if (!vuBar) return;
-    const clamped = Math.min(100, Math.max(0, rms * 1.4));
-    vuBar.style.width = `${clamped}%`;
+  function updateVu(rms) {
+    if (!vuMeterFill) return;
+    const pct = Math.min(100, Math.max(0, rms * 1.5));
+    vuMeterFill.style.width = pct + '%';
     setTimeout(() => {
-      if (vuBar) vuBar.style.width = '0%';
-    }, 250);
+      if (vuMeterFill) vuMeterFill.style.width = '0%';
+    }, 200);
   }
 
-  function handleHostStatus(status) {
-    if (!status) return;
-    if (status.realtimeActive || status.translationActive) {
-      isAssistantActive = true;
-      updateAssistantToggleUI(true);
-    } else {
-      isAssistantActive = false;
-      updateAssistantToggleUI(false);
-    }
-  }
-
-  // Processamento do Assistente em Tempo Real (Realtime Assistant)
-  function handleRealtimeUpdate(data) {
-    if (!data) return;
-    if (realtimeEmpty) realtimeEmpty.style.display = 'none';
+  // Renderiza evento do Realtime Assistant
+  function handleRealtimeEvent(data) {
+    if (!data || !remoteMessages) return;
+    if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
 
     const { type, id, text, response, audioSource } = data;
     const turnId = id || `turn_${Date.now()}`;
+    const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    let turnEl = turnsMap.get(turnId);
-    if (!turnEl) {
-      turnEl = document.createElement('div');
-      turnEl.className = 'bubble-turn';
-      turnEl.id = `turn-${turnId}`;
-      realtimeList.appendChild(turnEl);
-      turnsMap.set(turnId, turnEl);
+    let pair = turnsMap.get(turnId);
+    if (!pair) {
+      pair = { userEl: null, botEl: null };
+      turnsMap.set(turnId, pair);
     }
 
-    if (type === 'segment_start') {
-      const isInterviewer = audioSource === 'sys';
-      turnEl.innerHTML = `
-        <div class="${isInterviewer ? 'bubble-question' : 'bubble-candidate'}">
-          <div class="bubble-header">
-            <span class="bubble-author">${isInterviewer ? '👤 Interlocutor / Pergunta' : '🎙️ Você'}</span>
-            <span class="bubble-time">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+    const isInterviewer = audioSource === 'sys';
+
+    // Cria/Atualiza balão da fala
+    if (type === 'segment_start' || type === 'segment_whisper_correction') {
+      if (!pair.userEl) {
+        pair.userEl = document.createElement('div');
+        pair.userEl.className = 'message user';
+        pair.userEl.innerHTML = `
+          <div class="bubble">
+            <span class="${isInterviewer ? 'interviewer-speaker-badge' : 'candidate-speaker-badge'}">
+              ${isInterviewer ? 'Interlocutor / Pergunta' : 'Você (Microfone)'}
+            </span>
+            <div class="content">${type === 'segment_start' ? '<em>Ouvindo...</em>' : escapeHtml(text || '')}</div>
+            <div class="timestamp">${timeStr}</div>
           </div>
-          <div class="bubble-text"><em>Ouvindo...</em></div>
-        </div>
-      `;
-    } else if (type === 'segment_whisper_correction' && text) {
-      const isInterviewer = audioSource === 'sys';
-      const questionEl = turnEl.querySelector('.bubble-question, .bubble-candidate');
-      if (questionEl) {
-        const textEl = questionEl.querySelector('.bubble-text');
-        if (textEl) textEl.textContent = text;
+        `;
+        remoteMessages.appendChild(pair.userEl);
       } else {
-        turnEl.innerHTML = `
-          <div class="${isInterviewer ? 'bubble-question' : 'bubble-candidate'}">
-            <div class="bubble-header">
-              <span class="bubble-author">${isInterviewer ? '👤 Interlocutor' : '🎙️ Você'}</span>
-              <span class="bubble-time">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-            </div>
-            <div class="bubble-text">${escapeHtml(text)}</div>
-          </div>
-        `;
-      }
-    } else if (type === 'segment_response' && response) {
-      let respEl = turnEl.querySelector('.bubble-response');
-      if (!respEl) {
-        respEl = document.createElement('div');
-        respEl.className = 'bubble-response';
-        respEl.innerHTML = `
-          <div class="bubble-header">
-            <span class="bubble-author">🤖 Sugestão Helper Node</span>
-            <span class="bubble-time">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-          </div>
-          <div class="response-content"></div>
-        `;
-        turnEl.appendChild(respEl);
-      }
-      const contentEl = respEl.querySelector('.response-content');
-      if (contentEl) {
-        contentEl.innerHTML = formatMarkdownToHtml(response);
+        const contentEl = pair.userEl.querySelector('.content');
+        if (contentEl && text) contentEl.textContent = text;
       }
     }
 
-    scrollToBottom(realtimeList);
+    // Cria/Atualiza balão da resposta da IA
+    if (type === 'segment_response' && response) {
+      if (!pair.botEl) {
+        pair.botEl = document.createElement('div');
+        pair.botEl.className = 'message bot';
+        pair.botEl.innerHTML = `
+          <img src="chat.png" class="avatar" alt="Helper Node">
+          <div class="bubble">
+            <span class="ai-suggestion-badge">Sugestão Helper Node</span>
+            <div class="content">${formatMarkdown(response)}</div>
+            <div class="timestamp">${timeStr}</div>
+          </div>
+        `;
+        remoteMessages.appendChild(pair.botEl);
+      } else {
+        const contentEl = pair.botEl.querySelector('.content');
+        if (contentEl) contentEl.innerHTML = formatMarkdown(response);
+      }
+    }
+
+    scrollToBottom();
   }
 
-  // Processamento do Assistente de Tradução
-  function handleTranslationResult(data) {
-    if (!data) return;
-    if (translationEmpty) translationEmpty.style.display = 'none';
+  // Renderiza evento do Assistente de Tradução
+  function handleTranslationEvent(data) {
+    if (!data || !remoteMessages) return;
+    if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
 
     const { id, transcript, response, mode } = data;
     const turnId = id || `trans_${Date.now()}`;
+    const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    let turnEl = turnsMap.get(turnId);
-    if (!turnEl) {
-      turnEl = document.createElement('div');
-      turnEl.className = 'bubble-turn';
-      turnEl.id = `turn-${turnId}`;
-      translationList.appendChild(turnEl);
-      turnsMap.set(turnId, turnEl);
+    let pair = turnsMap.get(turnId);
+    if (!pair) {
+      pair = { userEl: null, botEl: null };
+      turnsMap.set(turnId, pair);
     }
 
     const isCandidate = mode === 'candidate';
 
-    turnEl.innerHTML = `
-      <div class="${isCandidate ? 'bubble-candidate' : 'bubble-question'}">
-        <div class="bubble-header">
-          <span class="bubble-author">${isCandidate ? '🎙️ Você (Candidato)' : '🌐 Áudio em Inglês'}</span>
-          <span class="bubble-time">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+    if (!pair.userEl) {
+      pair.userEl = document.createElement('div');
+      pair.userEl.className = 'message user';
+      pair.userEl.innerHTML = `
+        <div class="bubble">
+          <span class="${isCandidate ? 'candidate-speaker-badge' : 'interviewer-speaker-badge'}">
+            ${isCandidate ? 'Você (Candidato)' : 'Áudio em Inglês'}
+          </span>
+          <div class="content">${escapeHtml(transcript || '')}</div>
+          <div class="timestamp">${timeStr}</div>
         </div>
-        <div class="bubble-text">${escapeHtml(transcript || '')}</div>
-      </div>
-      ${response ? `
-        <div class="bubble-response">
-          <div class="bubble-header">
-            <span class="bubble-author">💡 Tradução & Sugestão</span>
-          </div>
-          <div class="response-content">${formatMarkdownToHtml(response)}</div>
-        </div>
-      ` : ''}
-    `;
+      `;
+      remoteMessages.appendChild(pair.userEl);
+    } else {
+      const contentEl = pair.userEl.querySelector('.content');
+      if (contentEl && transcript) contentEl.textContent = transcript;
+    }
 
-    scrollToBottom(translationList);
+    if (response) {
+      if (!pair.botEl) {
+        pair.botEl = document.createElement('div');
+        pair.botEl.className = 'message bot';
+        pair.botEl.innerHTML = `
+          <img src="chat.png" class="avatar" alt="Helper Node">
+          <div class="bubble">
+            <span class="ai-suggestion-badge">Tradução & Sugestão</span>
+            <div class="content">${formatMarkdown(response)}</div>
+            <div class="timestamp">${timeStr}</div>
+          </div>
+        `;
+        remoteMessages.appendChild(pair.botEl);
+      } else {
+        const contentEl = pair.botEl.querySelector('.content');
+        if (contentEl) contentEl.innerHTML = formatMarkdown(response);
+      }
+    }
+
+    scrollToBottom();
   }
 
-  function formatMarkdownToHtml(text) {
+  function formatMarkdown(text) {
     if (!text) return '';
     let html = escapeHtml(text);
-    // Negrito
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // Itálico
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Código inline
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // Listas / Bullet points
     html = html.replace(/^\s*[-*•]\s+(.*)$/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-    // Quebras de linha
     html = html.replace(/\n\n/g, '<p></p>');
     html = html.replace(/\n/g, '<br/>');
     return html;
@@ -347,13 +381,12 @@
     return div.innerHTML;
   }
 
-  function scrollToBottom(container) {
-    if (container && container.parentElement) {
-      container.parentElement.scrollTop = container.parentElement.scrollHeight;
+  function scrollToBottom() {
+    if (remoteMessages) {
+      remoteMessages.scrollTop = remoteMessages.scrollHeight;
     }
   }
 
-  // Inicializar quando o DOM estiver pronto
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAbly);
   } else {
